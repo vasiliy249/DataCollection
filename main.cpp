@@ -4,6 +4,7 @@
 #include "gumbo.h"
 #include <iostream>
 #include <string>
+#include <vector>
 #include <codecvt>
 #include <cstdlib>
 #include <sstream>
@@ -45,7 +46,8 @@ int main() {
   easy_handle.perform();
   
   GumboOutput* output = gumbo_parse(resp.str().c_str());
-  search_for_links(output->root);
+  std::vector<std::string> out = search_for_links(output->root);
+	for (auto i = out.begin(); i != out.end(); ++i) std::cout << *i << std::endl;
   gumbo_destroy_output(&kGumboDefaultOptions, output);
 
   system("pause");

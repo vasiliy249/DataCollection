@@ -8,22 +8,26 @@
 #include <cstdlib>
 #include <sstream>
 
-static void search_for_links(GumboNode* node) {
+static std::vector<std::string> search_for_links(GumboNode* node) {
+	std::vector<std::string> out;
   if (node->type != GUMBO_NODE_ELEMENT) {
-    return;
+    return out;
   }
   
   if (node->v.element.tag == GUMBO_TAG_A) {
     GumboAttribute* href = gumbo_get_attribute(&node->v.element.attributes, "href");
     if (href) {
-      std::cout << href->value << std::endl;
+      out.push_back(href->value);
     }
   }
 
   GumboVector* children = &node->v.element.children;
   for (unsigned int i = 0; i < children->length; ++i) {
-    search_for_links(static_cast<GumboNode*>(children->data[i]));
+    std::vector<std::string> out2 = search_for_links(static_cast<GumboNode*>(children->data[i]));
+		out.reserve(out.size()+out2.size());
+		out.insert(out.end(), out2.begin(), out2.end());
   }
+	return out;
 }
 
 std::wstring utf8_to_wstring(const std::string& str) {

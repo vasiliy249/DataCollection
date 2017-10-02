@@ -3,26 +3,38 @@
 #include <codecvt>
 #include <fstream>
 
+struct FileHolder {
+  FileHolder(const std::string& file) : file_(file) {}
+  ~FileHolder() {
+    ::remove(file_.c_str());
+  }
+  std::string file_;
+};
+
 std::wstring utf8_to_wstring(const std::string& str) {
   std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
   return myconv.from_bytes(str);
 }
 
-DWORD RunAdnWait(const std::string& path, const std::string& params) {
-  std::ostringstream stm;
-  stm << "\"" << path << "\"" << " " << params;
+DWORD RunAndWait(const std::string& module_path,
+                 const std::string& params) {
   STARTUPINFO si;
   memset(&si, 0, sizeof(si));
   si.cb = sizeof(si);
-
   PROCESS_INFORMATION pi;
   memset(&pi, 0, sizeof(pi));
-  size_t str_size = static_cast<size_t>(stm.tellp()) + 1;
-  std::vector<char> args(str_size);
-  strcpy_s(&args[0], str_size, stm.str().c_str());
-  ::CreateProcessA(path.c_str(), &args[0], NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+
+  std::string command_line = module_path + " " + params;
+  std::vector<char> sz_params(command_line.begin(), command_line.end());
+  sz_params.push_back(0);
+
+  if (!::CreateProcessA(module_path.c_str(), &sz_params[0],
+                        NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+  {
+    return 1;
+  }
   ::WaitForSingleObject(pi.hProcess, INFINITE);
-  DWORD code = 0;
+  DWORD code = 1;
   ::GetExitCodeProcess(pi.hProcess, &code);
   ::CloseHandle(pi.hProcess);
   ::CloseHandle(pi.hThread);
@@ -75,11 +87,37 @@ bool DataCollector::GetHtmlData(std::wstring& text, Links& links) {
 }
 
 bool DataCollector::GetPdfData(std::string& text) {
-  //std::ofstream outfile("new.pdf", std::ofstream::binary);
-  //outfile.write(resp.str().c_str(), resp.str().size());
+  if (url_.empty()) {
+    return false;
+  }
+  request_handler_.setOpt(cURLpp::Options::Url(url_));
+  std::string str_tmp_path;
+  char char_path[MAX_PATH];
+  if (GetTempPath(MAX_PATH, char_path)) {
+    str_tmp_path = char_path;
+  }
+  FileHolder txt_file(str_tmp_path + "new.txt");
+  FileHolder pdf_file(str_tmp_path + "new.pdf");
+  
+  std::ofstream resp_stream(pdf_file.file_, std::ofstream::binary);
+  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
+  request_handler_.perform();
+  resp_stream.close();
+  DWORD code = RunAndWait("C:\\externals\\bin\\xpdf\\bin32\\pdftotext.exe",
+                          pdf_file.file_ + " " + txt_file.file_);
+  if (code != 0) {
+    return false;
+  }
 
-  //RunAdnWait("C:\\externals\\bin\\xpdf\\bin32\\pdftotext.exe", "guide.pdf new.txt");
-  return false;
+  std::ifstream txt_stream(txt_file.file_);
+  if (txt_stream.is_open()) {
+    std::stringstream buff;
+    buff << txt_stream.rdbuf();
+    text = buff.str();
+    txt_stream.close();
+  }
+  resp_stream.close();
+  return true;
 }
 
 bool DataCollector::GetDocDat(std::string& text) {

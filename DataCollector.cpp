@@ -103,8 +103,7 @@ bool DataCollector::GetPdfData(std::string& text) {
   request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
   request_handler_.perform();
   resp_stream.close();
-  DWORD code = RunAndWait("C:\\externals\\bin\\xpdf\\bin32\\pdftotext.exe",
-                          pdf_file.file_ + " " + txt_file.file_);
+  DWORD code = RunAndWait("pdftotext.exe", pdf_file.file_ + " " + txt_file.file_);
   if (code != 0) {
     return false;
   }
@@ -120,8 +119,37 @@ bool DataCollector::GetPdfData(std::string& text) {
   return true;
 }
 
-bool DataCollector::GetDocDat(std::string& text) {
-  return false;
+bool DataCollector::GetDocData(std::string& text) {
+  if (url_.empty()) {
+    return false;
+  }
+  request_handler_.setOpt(cURLpp::Options::Url(url_));
+  std::string str_tmp_path;
+  char char_path[MAX_PATH];
+  if (GetTempPath(MAX_PATH, char_path)) {
+    str_tmp_path = char_path;
+  }
+  FileHolder txt_file(str_tmp_path + "new.txt");
+  FileHolder docx_file(str_tmp_path + "new.docx");
+
+  std::ofstream resp_stream(docx_file.file_, std::ofstream::binary);
+  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
+  request_handler_.perform();
+  resp_stream.close();
+  DWORD code = RunAndWait("docx2txt.bat", docx_file.file_);
+  if (code != 0) {
+    return false;
+  }
+
+  std::ifstream txt_stream(txt_file.file_);
+  if (txt_stream.is_open()) {
+    std::stringstream buff;
+    buff << txt_stream.rdbuf();
+    text = buff.str();
+    txt_stream.close();
+  }
+  resp_stream.close();
+  return true;
 }
 
 bool DataCollector::GetLinks(GumboNode* node, Links& links) {

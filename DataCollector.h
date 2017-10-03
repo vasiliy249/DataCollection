@@ -18,7 +18,7 @@ public:
 
   bool GetHtmlData(std::wstring& text, Links& links);
   bool GetPdfData(std::string& text);
-  bool GetDocDat(std::string& text);
+  bool GetDocData(std::string& text);
 
 private:
   bool GetLinks(GumboNode* node, Links& links);

@@ -31,6 +31,15 @@ int main() {
     std::cout << "Error during perform request\n";
   }
 
+  data_collector.Reset();
+  data_collector.SetUrl("core.ecu.edu/psyc/wuenschk/SPSS/ReadPlainText.docx");
+  std::string docx_text;
+  if (data_collector.GetDocData(docx_text)) {
+    std::cout << "*** TEXT FROM DOWNLOADED DOCX ***\n\n";
+    std::cout << docx_text;
+  } else {
+    std::cout << "Error during perform request\n";
+  }
   system("pause");
   return 0;
 }

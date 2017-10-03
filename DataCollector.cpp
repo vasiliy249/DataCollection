@@ -3,6 +3,15 @@
 #include <codecvt>
 #include <fstream>
 
+std::string GetTempPath() {
+  std::string str_tmp_path;
+  char char_path[MAX_PATH];
+  if (GetTempPath(MAX_PATH, char_path)) {
+    str_tmp_path = char_path;
+  }
+  return str_tmp_path;
+}
+
 struct FileHolder {
   FileHolder(const std::string& file) : file_(file) {}
   ~FileHolder() {
@@ -67,7 +76,45 @@ bool DataCollector::GetHtmlData(std::wstring& text, Links& links) {
   request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
   request_handler_.perform();
 
-  GumboOutput* output = gumbo_parse(resp_stream.str().c_str());
+  return GetHtmlDataFromString(resp_stream.str(), text, links);
+}
+
+bool DataCollector::GetPdfData(std::string& text) {
+  if (url_.empty()) {
+    return false;
+  }
+  request_handler_.setOpt(cURLpp::Options::Url(url_));
+  std::string str_tmp_path = GetTempPath();
+  FileHolder pdf_file(str_tmp_path + "new.pdf");
+  
+  std::ofstream resp_stream(pdf_file.file_, std::ofstream::binary);
+  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
+  request_handler_.perform();
+  resp_stream.close();
+
+  return GetTextFromPdfFile(pdf_file.file_, text);
+}
+
+bool DataCollector::GetDocxData(std::string& text) {
+  if (url_.empty()) {
+    return false;
+  }
+  request_handler_.setOpt(cURLpp::Options::Url(url_));
+  std::string str_tmp_path = GetTempPath();
+  FileHolder docx_file(str_tmp_path + "new.docx");
+
+  std::ofstream resp_stream(docx_file.file_, std::ofstream::binary);
+  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
+  request_handler_.perform();
+  resp_stream.close();
+
+  return GetTextFromDocxFile(docx_file.file_, text);
+}
+
+bool DataCollector::GetHtmlDataFromString(const std::string& utf8_html_string,
+                                          std::wstring& text, Links& links)
+{
+  GumboOutput* output = gumbo_parse(utf8_html_string.c_str());
 
   if (!GetLinks(output->root, links)) {
     links.clear();
@@ -82,28 +129,15 @@ bool DataCollector::GetHtmlData(std::wstring& text, Links& links) {
   }
 
   gumbo_destroy_output(&kGumboDefaultOptions, output);
-
   return true;
 }
 
-bool DataCollector::GetPdfData(std::string& text) {
-  if (url_.empty()) {
-    return false;
-  }
-  request_handler_.setOpt(cURLpp::Options::Url(url_));
-  std::string str_tmp_path;
-  char char_path[MAX_PATH];
-  if (GetTempPath(MAX_PATH, char_path)) {
-    str_tmp_path = char_path;
-  }
+bool DataCollector::GetTextFromPdfFile(const std::string& path,
+                                       std::string& text)
+{
+  std::string str_tmp_path = GetTempPath();
   FileHolder txt_file(str_tmp_path + "new.txt");
-  FileHolder pdf_file(str_tmp_path + "new.pdf");
-  
-  std::ofstream resp_stream(pdf_file.file_, std::ofstream::binary);
-  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
-  request_handler_.perform();
-  resp_stream.close();
-  DWORD code = RunAndWait("pdftotext.exe", pdf_file.file_ + " " + txt_file.file_);
+  DWORD code = RunAndWait("pdftotext.exe", path + " " + txt_file.file_);
   if (code != 0) {
     return false;
   }
@@ -114,32 +148,26 @@ bool DataCollector::GetPdfData(std::string& text) {
     buff << txt_stream.rdbuf();
     text = buff.str();
     txt_stream.close();
+    return true;
   }
-  resp_stream.close();
-  return true;
+  return false;
 }
 
-bool DataCollector::GetDocData(std::string& text) {
-  if (url_.empty()) {
+bool DataCollector::GetTextFromDocxFile(const std::string& path,
+                                        std::string& text)
+{
+  std::string directory;
+  size_t pos = path.find_last_of('\\');
+  if (pos == std::string::npos) {
     return false;
+  } else {
+    directory = path.substr(0, pos + 1);
   }
-  request_handler_.setOpt(cURLpp::Options::Url(url_));
-  std::string str_tmp_path;
-  char char_path[MAX_PATH];
-  if (GetTempPath(MAX_PATH, char_path)) {
-    str_tmp_path = char_path;
-  }
-  FileHolder txt_file(str_tmp_path + "new.txt");
-  FileHolder docx_file(str_tmp_path + "new.docx");
-
-  std::ofstream resp_stream(docx_file.file_, std::ofstream::binary);
-  request_handler_.setOpt(cURLpp::Options::WriteStream(&resp_stream));
-  request_handler_.perform();
-  resp_stream.close();
-  DWORD code = RunAndWait("docx2txt.bat", docx_file.file_);
+  DWORD code = RunAndWait("docx2txt.bat", path);
   if (code != 0) {
     return false;
   }
+  FileHolder txt_file(directory + "new.txt");
 
   std::ifstream txt_stream(txt_file.file_);
   if (txt_stream.is_open()) {
@@ -148,7 +176,6 @@ bool DataCollector::GetDocData(std::string& text) {
     text = buff.str();
     txt_stream.close();
   }
-  resp_stream.close();
   return true;
 }
 

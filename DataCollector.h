@@ -18,7 +18,15 @@ public:
 
   bool GetHtmlData(std::wstring& text, Links& links);
   bool GetPdfData(std::string& text);
-  bool GetDocData(std::string& text);
+  bool GetDocxData(std::string& text);
+
+  bool GetHtmlDataFromString(const std::string& utf8_html_string,
+                             std::wstring& text, Links& links);
+  bool GetTextFromPdfFile(const std::string& path,
+                          std::string& text);
+  // only absolute path!
+  bool GetTextFromDocxFile(const std::string& path,
+                           std::string& text);
 
 private:
   bool GetLinks(GumboNode* node, Links& links);

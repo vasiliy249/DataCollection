@@ -34,7 +34,7 @@ int main() {
   data_collector.Reset();
   data_collector.SetUrl("core.ecu.edu/psyc/wuenschk/SPSS/ReadPlainText.docx");
   std::string docx_text;
-  if (data_collector.GetDocData(docx_text)) {
+  if (data_collector.GetDocxData(docx_text)) {
     std::cout << "*** TEXT FROM DOWNLOADED DOCX ***\n\n";
     std::cout << docx_text;
   } else {
